@@ -118,7 +118,11 @@
               @keydown.ctrl.enter="addComment"
             ></textarea>
             <div class="comment-actions">
-              <button @click="addComment" :disabled="!newComment.trim() || !task" class="btn btn-primary">
+              <button
+                @click="addComment"
+                :disabled="!newComment.trim() || !task"
+                class="btn btn-primary"
+              >
                 <i class="fas fa-paper-plane"></i>
                 Envoyer
               </button>
@@ -322,9 +326,10 @@ export default {
     },
 
     cancelDescriptionEdit() {
-      this.editedDescription = this.task && this.task.content && this.task.content.rendered
-        ? this.task.content.rendered.replace(/<[^>]*>/g, '')
-        : '';
+      this.editedDescription =
+        this.task && this.task.content && this.task.content.rendered
+          ? this.task.content.rendered.replace(/<[^>]*>/g, '')
+          : '';
       this.editingDescription = false;
     },
 
@@ -966,4 +971,3 @@ export default {
   }
 }
 </style>
-

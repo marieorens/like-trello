@@ -1,18 +1,18 @@
 import Vue from 'vue';
 import VueRouter from 'vue-router';
-import Home from '../views/Home.vue';
+import Board from '../views/Board.vue';
 
 Vue.use(VueRouter);
 
 const routes = [
   {
     path: '/',
-    name: 'Home',
-    component: Home,
+    name: 'Board',
+    component: Board,
   },
   {
     path: '/board/:categoryId?',
-    name: 'Board',
+    name: 'CategoryBoard',
     component: () => import('../views/Board.vue'),
     props: true,
   },

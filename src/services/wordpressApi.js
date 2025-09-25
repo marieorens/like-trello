@@ -123,9 +123,7 @@ class WordPressAPI {
   async createCategory(categoryData) {
     try {
       const response = await this.client.post('/categories', {
-        name: categoryData.title,
-        slug: categoryData.name,
-        description: categoryData.description || '',
+        name: categoryData.name,
       });
 
       return {
@@ -288,7 +286,7 @@ class WordPressAPI {
       };
     } catch (error) {
       console.error('createPost error:', error);
-      console.error('createPost error details:', error.response?.data || error.message); 
+      console.error('createPost error details:', error.response?.data || error.message);
       return { success: false, error };
     }
   }
@@ -434,6 +432,76 @@ class WordPressAPI {
       console.log('Axios instance test response:', response.data);
     } catch (error) {
       console.error('Axios instance test error:', error);
+    }
+  }
+
+  async createTask(taskData) {
+    try {
+      const response = await this.client.post('/posts', {
+        title: taskData.title,
+        content: taskData.content,
+        categories: [taskData.categoryId],
+        status: 'publish',
+      });
+
+      return {
+        success: true,
+        data: {
+          id: response.data.id,
+          title: response.data.title.rendered,
+          content: response.data.content.rendered,
+          categoryId: taskData.categoryId,
+        },
+      };
+    } catch (error) {
+      return { success: false, error };
+    }
+  }
+
+  async updateTask(taskId, taskData) {
+    try {
+      const response = await this.client.put(`/posts/${taskId}`, {
+        title: taskData.title,
+        content: taskData.content,
+        categories: taskData.categoryId ? [taskData.categoryId] : undefined,
+      });
+
+      return {
+        success: true,
+        data: {
+          id: response.data.id,
+          title: response.data.title.rendered,
+          content: response.data.content.rendered,
+          categoryId: response.data.categories[0],
+        },
+      };
+    } catch (error) {
+      return { success: false, error };
+    }
+  }
+
+  async getTasksByCategory(categoryId) {
+    try {
+      const response = await this.client.get(`/posts?categories=${categoryId}`);
+      const tasks = response.data.map(task => ({
+        id: task.id,
+        title: task.title.rendered, // Extraction du titre rendu
+        content: task.content.rendered.replace(/<[^>]*>/g, ''), // Suppression des balises HTML
+      }));
+      return { success: true, data: tasks };
+    } catch (error) {
+      console.error('Erreur lors de la récupération des tâches:', error);
+      return { success: false, error };
+    }
+  }
+
+  async deleteTask(taskId) {
+    try {
+      const response = await this.client.delete(`/posts/${taskId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Erreur lors de la suppression de la tâche:', error);
+      return { success: false, error };
     }
   }
 }
