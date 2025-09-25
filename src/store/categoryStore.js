@@ -9,13 +9,28 @@ export const useCategoryStore = defineStore('categoryStore', {
     async loadCategories() {
       const response = await wordpressAPI.getCategories();
       if (response.success) {
-        this.categories = response.data;
+        const categoriesWithTasks = await Promise.all(
+          response.data.map(async cat => {
+            const tasksResponse = await wordpressAPI.getPosts(cat.id);
+            return {
+              ...cat,
+              title: cat.title || cat.name || '',
+              tasks: tasksResponse.success ? tasksResponse.data : [],
+            };
+          })
+        );
+        this.categories = categoriesWithTasks;
       }
     },
     async addCategory(category) {
       const response = await wordpressAPI.createCategory(category);
       if (response.success) {
-        this.categories.push(response.data);
+        const cat = response.data;
+        this.categories.push({
+          ...cat,
+          title: cat.title || cat.name || '',
+          tasks: Array.isArray(cat.tasks) ? cat.tasks : [],
+        });
       }
     },
     async updateCategory(category) {

@@ -429,7 +429,7 @@ export default {
 
     // Modal management
     closeModal() {
-      this.$emit('close');
+      this.$emit('closeModal');
     },
 
     // Utilities

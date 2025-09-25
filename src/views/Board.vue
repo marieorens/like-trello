@@ -35,12 +35,12 @@
           drop-class="task-ghost-drop"
         >
           <Draggable v-for="(task, index) in board.tasks" :key="index">
-            <div class="task">
-              <h3>{{ task.text }}</h3>
-              <button @click="deleteTask(board.name, index)">
+            <div class="task" @click="openTaskDetails(task, board)">
+              <h3>{{ task.title && task.title.rendered ? task.title.rendered : (task.title || task.text) }}</h3>
+              <button @click.stop="deleteTask(board.name, index)">
                 <i class="fas fa-trash"></i>
               </button>
-              <button @click="editTask(board.name, index)" class="btn-edit-task">
+              <button @click.stop="editTask(board.name, index)" class="btn-edit-task">
                 <i class="fas fa-edit"></i>
               </button>
             </div>
@@ -52,12 +52,22 @@
     <button class="btn-create-category" @click="createCategory">
       <i class="fas fa-plus"></i> Nouvelle Catégorie
     </button>
+
+    <CardDetails
+      v-if="showTaskModal"
+      :task="selectedTask"
+      :category="selectedCategory"
+      :isVisible="showTaskModal"
+      @closeModal="closeTaskDetails"
+    />
   </div>
 </template>
 
 <script>
+import CardDetails from '../components/CardDetails.vue';
 import { Container, Draggable } from 'vue-smooth-dnd';
-import { useBoardStore } from '../store/boardStore';
+import { useCategoryStore } from '../store/categoryStore';
+import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import Swal from 'sweetalert2';
 import wordpressAPI from '../services/wordpressApi';
@@ -67,11 +77,33 @@ export default {
   components: {
     Container,
     Draggable,
+    CardDetails,
   },
   setup() {
-    const boardStore = useBoardStore();
-    boardStore.loadCategories();
-    const { boards } = storeToRefs(boardStore);
+    const showTaskModal = ref(false);
+    const selectedTask = ref(null);
+    const selectedCategory = ref(null);
+
+    function openTaskDetails(task, board) {
+      selectedTask.value = task;
+      selectedCategory.value = board;
+      showTaskModal.value = true;
+    }
+    function closeTaskDetails() {
+      showTaskModal.value = false;
+      selectedTask.value = null;
+      selectedCategory.value = null;
+    }
+    const categoryStore = useCategoryStore();
+    categoryStore.loadCategories();
+    const { categories } = storeToRefs(categoryStore);
+    const boards = computed(() =>
+      categories.value.map(cat => ({
+        ...cat,
+        title: cat.title || cat.name,
+        tasks: cat.tasks || []
+      }))
+    );
 
     const createCategory = async () => {
       const { value: categoryName } = await Swal.fire({
@@ -86,26 +118,18 @@ export default {
         },
       });
       if (categoryName) {
-        const response = await wordpressAPI.createCategory({ name: categoryName });
-        if (response.success) {
-          await boardStore.loadCategories();
-          Swal.fire(
-            'Succès',
-            `La catégorie "${categoryName}" a été créée avec succès !`,
-            'success'
-          );
-        } else {
-          Swal.fire(
-            'Erreur',
-            response.error.message || 'Erreur lors de la création de la catégorie',
-            'error'
-          );
-        }
+        await categoryStore.addCategory({ name: categoryName });
+        await categoryStore.loadCategories();
+        Swal.fire(
+          'Succès',
+          `La catégorie "${categoryName}" a été créée avec succès !`,
+          'success'
+        );
       }
     };
 
     const editCategory = async categoryId => {
-      const category = boards.value.find(board => board.id === categoryId);
+      const category = categories.value.find(cat => cat.id === categoryId);
       if (!category) return;
       const { value: newTitle } = await Swal.fire({
         title: 'Modifier le nom de la catégorie',
@@ -119,25 +143,14 @@ export default {
         },
       });
       if (newTitle) {
-        const response = await wordpressAPI.updateCategory(categoryId, {
-          title: newTitle,
-          name: category.name,
-        });
-        if (response.success) {
-          await boardStore.loadCategories();
-          Swal.fire('Succès', 'Nom de la catégorie modifié avec succès', 'success');
-        } else {
-          Swal.fire(
-            'Erreur',
-            response.error.message || 'Erreur lors de la modification du nom de la catégorie',
-            'error'
-          );
-        }
+  await categoryStore.updateCategory({ ...category, title: newTitle });
+  await categoryStore.loadCategories();
+  Swal.fire('Succès', 'Nom de la catégorie modifié avec succès', 'success');
       }
     };
 
     const deleteCategory = async categoryId => {
-      const category = boards.value.find(board => board.id === categoryId);
+      const category = categories.value.find(cat => cat.id === categoryId);
       if (!category) return;
       const confirmation = await Swal.fire({
         title: 'Êtes-vous sûr ?',
@@ -148,21 +161,9 @@ export default {
         cancelButtonText: 'Annuler',
       });
       if (confirmation.isConfirmed) {
-        const response = await wordpressAPI.deleteCategory(categoryId);
-        if (response.success) {
-          await boardStore.loadCategories();
-          Swal.fire(
-            'Succès',
-            'Catégorie supprimée avec succès',
-            'success'
-          );
-        } else {
-          Swal.fire(
-            'Erreur',
-            response.error.message || 'Erreur lors de la suppression de la catégorie',
-            'error'
-          );
-        }
+  await categoryStore.deleteCategory(categoryId);
+  await categoryStore.loadCategories();
+  Swal.fire('Succès', 'Catégorie supprimée avec succès', 'success');
       }
     };
 
@@ -197,7 +198,7 @@ export default {
           categoryId: category.id,
         });
         if (response.success) {
-          await boardStore.loadCategories();
+          await categoryStore.loadCategories();
           Swal.fire(
             'Succès',
             'Tâche créée avec succès',
@@ -244,7 +245,7 @@ export default {
           content: formValues.content,
         });
         if (response.success) {
-          await boardStore.loadCategories();
+          await categoryStore.loadCategories();
           Swal.fire(
             'Succès',
             'Tâche modifiée avec succès',
@@ -278,7 +279,7 @@ export default {
       if (confirmation.isConfirmed) {
         const response = await wordpressAPI.deleteTask(task.id);
         if (response.success) {
-          await boardStore.loadCategories();
+          await categoryStore.loadCategories();
           Swal.fire(
             'Succès',
             'Tâche supprimée avec succès',
@@ -332,7 +333,13 @@ export default {
       getChildPayload,
       handleDragStart,
       handleDrop,
+      showTaskModal,
+      selectedTask,
+      selectedCategory,
+      openTaskDetails,
+      closeTaskDetails,
     };
+   
   },
 };
 </script>
